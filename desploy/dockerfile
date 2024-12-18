@@ -1,0 +1,10 @@
+FROM maven:3.8.5-openjdk-17 as builder
+ENV TZ="America/Bogota"
+WORKDIR /app
+COPY . .
+RUN mvn clean package -DskipTests
+
+# Stage 2: Production
+FROM gcr.io/distroless/java17
+COPY --from=builder /app/target/*.jar /app/app.jar
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

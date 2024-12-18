@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: $ACR_REPOSITORY_NAME
+  name: $ACR_REPOSITORY_NAME
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: $ACR_REPOSITORY_NAME
+  template:
+    metadata:
+      labels:
+        app: $ACR_REPOSITORY_NAME
+    spec:
+      containers:
+        - name: $ACR_REPOSITORY_NAME-container
+          image: $ACR_IMAGE_URI
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              cpu: 200m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: $ACR_REPOSITORY_NAME
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: $ACR_REPOSITORY_NAME
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: $ACR_REPOSITORY_NAME-ingress
+spec:
+  ingressClassName: $INGRESS_CLASS
+  rules:
+    - http:
+        paths:
+          - path: $API_PREFIX
+            pathType: Prefix
+            backend:
+              service:
+                name: $ACR_REPOSITORY_NAME
+                port:
+                  number: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: $ACR_REPOSITORY_NAME-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: $ACR_REPOSITORY_NAME
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70

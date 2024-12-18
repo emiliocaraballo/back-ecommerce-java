@@ -1,0 +1,105 @@
+trigger:
+- develop
+- staging
+- master
+- hotfix/*
+
+variables:
+  - group: 'app-brilla-commons-env-dev'
+  - name: vmImageName
+    value: 'ubuntu-latest'
+  - name: IMAGE_TAG
+    value: '$(Build.BuildId)'
+  - name: DOCKER_FILE_PATH
+    value: '$(Build.SourcesDirectory)/deployment-config/dockerfile'
+  - name: APP_COMMONS_KEY_PATH
+    value: '$(Build.SourcesDirectory)/appBrillaCommonsKey'
+  - ${{ if eq(variables['Build.SourceBranchName'], 'develop') }}:
+      - group: 'app-brilla-commons-env-dev'
+  - ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
+      - group: 'app-brilla-commons-env-qa'
+  - ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
+      - group: 'app-brilla-commons-env'
+  - ${{ if contains(variables['Build.SourceBranchName'], 'hotfix/') }}:
+      - group: 'app-brilla-commons-env'
+
+pool:
+  vmImage: $(vmImageName)
+
+steps:
+- task: DownloadSecureFile@1
+  name: appBrillaCommonsKey
+  displayName: 'Download commons ssh key'
+  inputs:
+    secureFile: 'appBrillaCommonsKey'
+
+- task: Bash@3
+  displayName: Reemplazar application.yml file
+  inputs:
+    targetType: 'inline'
+    script: |
+      # Descargar el archivo de claves
+      cp $(appBrillaCommonsKey.secureFilePath) $(APP_COMMONS_KEY_PATH)
+
+      # Reemplazar las variables en application.yml usando sed
+      sed -i "s/\${NODE_ENV}/${NODE_ENV}/g" $(Build.SourcesDirectory)/src/main/resources/application.yml
+      sed -i "s/\${SHOW_SQL}/${SHOW_SQL}/g" $(Build.SourcesDirectory)/src/main/resources/application.yml
+      sed -i.bak "s|\${API_PREFIX}|${API_PREFIX}|g" $(Build.SourcesDirectory)/src/main/resources/application.yml
+      sed -i "s/\${SERVER_PORT}/${APP_PORT}/g" $(Build.SourcesDirectory)/src/main/resources/application.yml
+      sed -i "s/\${APP_TOKEN_KEY_VALUE}/${APP_TOKEN_KEY_VALUE}/g" $(Build.SourcesDirectory)/src/main/resources/application.yml
+      sed -i.bak "s|\${HOST_URL}|jdbc:sqlserver://$(DATABASE_HOST);encrypt=true;trustServerCertificate=false;databaseName=$(DATABASE_NAME)|g" $(Build.SourcesDirectory)/src/main/resources/application.yml
+      sed -i "s/\${DATABASE_USER}/${DATABASE_USER}/g" $(Build.SourcesDirectory)/src/main/resources/application.yml
+      sed -i "s/\${DATABASE_PASSWORD}/${DATABASE_PASSWORD}/g" $(Build.SourcesDirectory)/src/main/resources/application.yml
+      sed -i "s|\${LOGSTASH_HOST}|${LOGSTASH_HOST}|g" $(Build.SourcesDirectory)/src/main/resources/application.yml
+      sed -i "s|\${APPNAME}|${ACR_REPOSITORY_NAME}|g" $(Build.SourcesDirectory)/src/main/resources/application.yml
+
+      cat $(Build.SourcesDirectory)/src/main/resources/application.yml
+  env:
+    APP_TOKEN_KEY_VALUE: $(APP_TOKEN_KEY_VALUE)
+    DATABASE_HOST: $(DATABASE_HOST)
+    DATABASE_NAME: $(DATABASE_NAME)
+    DATABASE_PASSWORD: $(DATABASE_PASSWORD)
+    DATABASE_USER: $(DATABASE_USER)
+
+# Ejecutar la tarea de Maven
+- task: Maven@3
+  inputs:
+    mavenPomFile: 'pom.xml'
+    mavenOptions: '-Xmx4096m'
+    javaHomeOption: 'JDKVersion'
+    jdkVersionOption: '17'
+    jdkArchitectureOption: 'x64'
+    goals: 'clean package'
+
+- task: Docker@2
+  displayName: Build Docker image
+  inputs:
+    containerRegistry: $(ACR_CONNECTION_REGISTRY)
+    repository: $(ACR_REPOSITORY_NAME)
+    command: build
+    Dockerfile: $(DOCKER_FILE_PATH)
+    buildContext: .
+    tags: latest
+
+- task: Docker@2
+  displayName: Push Docker image
+  inputs:
+    containerRegistry: $(ACR_CONNECTION_REGISTRY)
+    repository: $(ACR_REPOSITORY_NAME)
+    command: 'push'
+    tags: latest
+
+- task: Bash@3
+  displayName: Replace Kubernetes YML
+  inputs:
+    targetType: 'inline'
+    script: |
+      export ACR_IMAGE_URI=${ACR_URI}/${ACR_REPOSITORY_NAME}:latest
+      envsubst < deployment-config/kubernetes-manifest.yml > deployment-config/kubernetes-manifest-with-envs.yml
+      mv deployment-config/kubernetes-manifest-with-envs.yml deployment-config/kubernetes-manifest.yml
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(System.DefaultWorkingDirectory)/deployment-config/'
+    ArtifactName: 'back-brilla-refinancing-artifact'
+    publishLocation: 'Container'
