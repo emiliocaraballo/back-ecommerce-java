@@ -6,6 +6,8 @@
 - IDE de tu preferencia (recomendado: IntelliJ IDEA, Eclipse, VS Code)
 - Git (opcional, para clonar repositorios)
 
+## Correr sprint de base de datos /src/main/resources/bd.sql en postgres 16
+
 ## Paso 1: Verificar instalaciones
 
 1. Verifica la versión de Java:
