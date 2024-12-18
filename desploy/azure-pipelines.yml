@@ -1,11 +1,11 @@
 trigger:
 - develop
 - staging
-- master
+- main
 - hotfix/*
 
 variables:
-  - group: 'app-brilla-commons-env-dev'
+  - group: 'app-commons-env-dev'
   - name: vmImageName
     value: 'ubuntu-latest'
   - name: IMAGE_TAG
@@ -13,25 +13,25 @@ variables:
   - name: DOCKER_FILE_PATH
     value: '$(Build.SourcesDirectory)/deployment-config/dockerfile'
   - name: APP_COMMONS_KEY_PATH
-    value: '$(Build.SourcesDirectory)/appBrillaCommonsKey'
+    value: '$(Build.SourcesDirectory)/appCommonsKey'
   - ${{ if eq(variables['Build.SourceBranchName'], 'develop') }}:
-      - group: 'app-brilla-commons-env-dev'
+      - group: 'app-commons-env-dev'
   - ${{ if eq(variables['Build.SourceBranchName'], 'staging') }}:
-      - group: 'app-brilla-commons-env-qa'
+      - group: 'app-commons-env-qa'
   - ${{ if eq(variables['Build.SourceBranchName'], 'master') }}:
-      - group: 'app-brilla-commons-env'
+      - group: 'app-commons-env'
   - ${{ if contains(variables['Build.SourceBranchName'], 'hotfix/') }}:
-      - group: 'app-brilla-commons-env'
+      - group: 'app-commons-env'
 
 pool:
   vmImage: $(vmImageName)
 
 steps:
 - task: DownloadSecureFile@1
-  name: appBrillaCommonsKey
+  name: appCommonsKey
   displayName: 'Download commons ssh key'
   inputs:
-    secureFile: 'appBrillaCommonsKey'
+    secureFile: 'appCommonsKey'
 
 - task: Bash@3
   displayName: Reemplazar application.yml file
@@ -39,7 +39,7 @@ steps:
     targetType: 'inline'
     script: |
       # Descargar el archivo de claves
-      cp $(appBrillaCommonsKey.secureFilePath) $(APP_COMMONS_KEY_PATH)
+      cp $(appCommonsKey.secureFilePath) $(APP_COMMONS_KEY_PATH)
 
       # Reemplazar las variables en application.yml usando sed
       sed -i "s/\${NODE_ENV}/${NODE_ENV}/g" $(Build.SourcesDirectory)/src/main/resources/application.yml
@@ -101,5 +101,5 @@ steps:
 - task: PublishBuildArtifacts@1
   inputs:
     PathtoPublish: '$(System.DefaultWorkingDirectory)/deployment-config/'
-    ArtifactName: 'back-brilla-refinancing-artifact'
+    ArtifactName: 'back-ecommerce'
     publishLocation: 'Container'
