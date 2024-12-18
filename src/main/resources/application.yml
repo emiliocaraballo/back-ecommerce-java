@@ -1,0 +1,47 @@
+server:
+  port: ${SERVER_PORT}
+spring:
+  netty:
+    threads:
+      max: 10
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: ${HOST_URL}
+    username: ${DATABASE_USER}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      minimum-idle: 10        # Mínimo de conexiones ociosas, aumenta este valor en prod
+      maximum-pool-size: 50    # Máximo de conexiones activas, ajusta según la carga de la app
+      idle-timeout: 30000      # (30 segundos) Evita que las conexiones se cierren muy pronto
+      connection-timeout: 15000 # (15 segundos) No esperes demasiado para obtener una conexión
+      max-lifetime: 1800000    # 30 minutos (tiempo de vida máximo de una conexión)
+      validation-timeout: 5000 # 5 segundos para validar una conexión antes de usarla
+  jpa:
+    show-sql: ${SHOW_SQL}
+    properties:
+      format_sql: ${SHOW_SQL}
+      use_sql_comments: ${SHOW_SQL}
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        ddl-auto: none
+application:
+  APPNAME: ${APPNAME}
+  LOGSTASH_HOST: ${LOGSTASH_HOST}
+  retrofit:
+    client:
+      callTimeout: ${CALL_TIMEOUT}
+      connectTimeout: ${CONNECT_TIMEOUT}
+      readTimeout: ${READ_TIMEOUT}
+      writeTimeout: ${WRITE_TIMEOUT}
+      ecommerceSoapUsername: ${ecommerce_SOAP_USERNAME}
+      ecommerceSoapPassword: ${ecommerce_SOAP_PASSWORD}
+      ecommerceSoapUrl: ${ecommerce_SOAP_URL}
+  request:
+    mappings: ${API_PREFIX}
+  secrets-token:
+    value: ${APP_TOKEN_KEY_VALUE}
+    expiration: 900000
+springdoc:
+  api-docs.path: /api-docs
+  # Specify the path of the Swagger UI
+  swagger-ui.path: /swagger-ui.html
